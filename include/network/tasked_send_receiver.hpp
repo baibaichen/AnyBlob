@@ -4,6 +4,7 @@
 #include "network/message_task.hpp"
 #include "network/socket.hpp"
 #include "utils/ring_buffer.hpp"
+#include <algorithm>
 #include <atomic>
 #include <condition_variable>
 #include <memory>
@@ -55,7 +56,11 @@ class TaskedSendReceiverGroup {
     /// The recv chunk size
     uint64_t _chunkSize;
     /// The queue maximum for each TaskedSendReceiver
-    unsigned _concurrentRequests;
+    std::atomic<unsigned> _concurrentRequests;
+    /// The upper bound for the concurrent requests that determines the io_uring depth of the TaskedSendReceivers
+    unsigned _maxConcurrentRequests;
+    /// The total bytes transferred by finished messages
+    std::atomic<uint64_t> _transferredBytes;
     /// The TCP settings
     std::unique_ptr<ConnectionManager::TCPSettings> _tcpSettings;
 
@@ -66,7 +71,7 @@ class TaskedSendReceiverGroup {
 
     public:
     /// Initializes the global submissions and completions
-    explicit TaskedSendReceiverGroup(unsigned chunkSize = 64u * 1024, uint64_t submissions = std::thread::hardware_concurrency() * submissionPerCore, uint64_t reuse = 0);
+    explicit TaskedSendReceiverGroup(unsigned chunkSize = 64u * 1024, uint64_t submissions = std::thread::hardware_concurrency() * submissionPerCore, uint64_t reuse = 0, unsigned maxConcurrentRequests = 32);
     /// Destructor
     ~TaskedSendReceiverGroup();
 
@@ -81,17 +86,27 @@ class TaskedSendReceiverGroup {
 
     /// Update the concurrent requests via config
     void setConfig(const network::Config& config) {
-        if (_concurrentRequests != config.coreRequests())
-            _concurrentRequests = config.coreRequests();
+        setConcurrentRequests(config.coreRequests());
     }
-    /// Update the concurrent requests
+    /// Update the concurrent requests clamped to the maximum concurrent requests
     void setConcurrentRequests(unsigned concurrentRequests) {
-        if (_concurrentRequests != concurrentRequests)
-            _concurrentRequests = concurrentRequests;
+        _concurrentRequests.store(std::min(concurrentRequests, _maxConcurrentRequests), std::memory_order_relaxed);
     }
     /// Get the concurrent requests
     unsigned getConcurrentRequests() const {
-        return _concurrentRequests;
+        return _concurrentRequests.load(std::memory_order_relaxed);
+    }
+    /// Get the upper bound for the concurrent requests
+    unsigned maxConcurrentRequests() const {
+        return _maxConcurrentRequests;
+    }
+    /// Get the total bytes transferred by finished messages
+    uint64_t getTransferredBytes() const {
+        return _transferredBytes.load(std::memory_order_relaxed);
+    }
+    /// Get the number of queued submissions
+    uint64_t getQueuedMessages() const {
+        return _submissions.size();
     }
 
     friend TaskedSendReceiver;

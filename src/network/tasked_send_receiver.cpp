@@ -22,7 +22,7 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TaskedSendReceiverGroup::TaskedSendReceiverGroup(unsigned chunkSize, uint64_t submissions, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _sendReceiverCache(submissions), _chunkSize(chunkSize), _concurrentRequests(network::Config::defaultCoreConcurrency), _tcpSettings(make_unique<ConnectionManager::TCPSettings>()), _cv(), _mutex()
+TaskedSendReceiverGroup::TaskedSendReceiverGroup(unsigned chunkSize, uint64_t submissions, uint64_t reuse, unsigned maxConcurrentRequests) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _sendReceiverCache(submissions), _chunkSize(chunkSize), _concurrentRequests(min(static_cast<unsigned>(network::Config::defaultCoreConcurrency), maxConcurrentRequests)), _maxConcurrentRequests(maxConcurrentRequests), _transferredBytes(0), _tcpSettings(make_unique<ConnectionManager::TCPSettings>()), _cv(), _mutex()
 // Initializes the global submissions and completions
 {
     TLSContext::initOpenSSL();
@@ -131,7 +131,7 @@ bool TaskedSendReceiverHandle::sendReceive(bool local, bool oneQueueInvocation)
     return true;
 }
 //---------------------------------------------------------------------------
-TaskedSendReceiver::TaskedSendReceiver(TaskedSendReceiverGroup& group) : _group(group), _submissions(), _next(nullptr), _connectionManager(make_unique<ConnectionManager>(group._concurrentRequests << 2)), _messageTasks(), _timings(nullptr), _stopDeamon(false)
+TaskedSendReceiver::TaskedSendReceiver(TaskedSendReceiverGroup& group) : _group(group), _submissions(), _next(nullptr), _connectionManager(make_unique<ConnectionManager>(group._maxConcurrentRequests << 2)), _messageTasks(), _timings(nullptr), _stopDeamon(false)
 // The constructor
 {
 }
@@ -212,7 +212,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             // Insert into the task vector
             _messageTasks.emplace_back(move(messageTask));
 
-            if (_messageTasks.size() >= _group._concurrentRequests)
+            if (_messageTasks.size() >= _group._concurrentRequests.load(memory_order_relaxed))
                 break;
         }
     };
@@ -249,7 +249,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             // Insert into the task vector
             _messageTasks.emplace_back(move(messageTask));
 
-            if (_messageTasks.size() >= _group._concurrentRequests)
+            if (_messageTasks.size() >= _group._concurrentRequests.load(memory_order_relaxed))
                 break;
         }
     };
@@ -279,6 +279,8 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                 auto status = task->execute(*_connectionManager);
                 // check if finished
                 if (status == MessageState::Finished || status == MessageState::Aborted) {
+                    if (status == MessageState::Finished)
+                        _group._transferredBytes.fetch_add(task->originalMessage->result.getSize(), memory_order_relaxed);
                     for (auto it = _messageTasks.begin(); it != _messageTasks.end(); it++) {
                         if (it->get() == task) {
                             // Remove the second param with the real data
@@ -302,7 +304,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                     firstException = current_exception();
             }
         }
-        if (!_stopDeamon && _messageTasks.size() < _group._concurrentRequests && !firstException) {
+        if (!_stopDeamon && _messageTasks.size() < _group._concurrentRequests.load(memory_order_relaxed) && !firstException) {
             local ? emplaceLocalRequest() : emplaceNewRequest();
         }
         auto cnt = _connectionManager->getSocketConnection().submit();
