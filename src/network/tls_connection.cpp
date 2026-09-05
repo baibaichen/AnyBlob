@@ -46,7 +46,11 @@ bool TLSConnection::init(HTTPSMessage* message)
             return false;
         }
         const auto& hostname = _message->originalMessage->provider.getAddress();
+#ifdef OPENSSL_IS_AWSLC
+        if (SSL_set_tlsext_host_name(_ssl, hostname.c_str()) != 1) {
+#else
         if (SSL_ctrl(_ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, const_cast<char*>(hostname.c_str())) != 1) {
+#endif
             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
             return false;
         }
