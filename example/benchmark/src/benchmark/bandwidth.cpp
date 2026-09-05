@@ -200,6 +200,7 @@ void Bandwidth::runAzureSdk(const Settings& benchmarkSettings, const string& uri
         clientOptions.ApiVersion = "2021-06-08";
         clientOptions.Retry.MaxRetries = 0;
         clientOptions.PerRetryPolicies.emplace_back(make_unique<AttemptCountingPolicy>(attempts));
+        clientOptions.Transport.Transport = benchmarkSettings.azureTransport;
         auto client = make_shared<Azure::Storage::Blobs::BlobClient>(blobUrl, credential, clientOptions);
 
         vector<utils::TimingHelper> timings(benchmarkSettings.requests);

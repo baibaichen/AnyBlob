@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+namespace Azure::Core::Http {
+class HttpTransport;
+}
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -59,6 +62,7 @@ class Bandwidth {
         uint64_t readOffset = 0;
         uint64_t readLength = 1024 * 1024;
         uint64_t requestTimeoutMs = 5000;
+        std::shared_ptr<Azure::Core::Http::HttpTransport> azureTransport;
     };
 
     /// Benchmark runner

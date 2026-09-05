@@ -61,10 +61,15 @@ include("${PROJECT_SOURCE_DIR}/src/local.cmake")
 # ---------------------------------------------------------------------------
 
 add_executable(AnyBlobBenchmark src/main.cpp ${SRC_CPP} ${INCLUDE_HPP})
-target_link_libraries(
-    AnyBlobBenchmark
+set(ANYBLOB_BENCHMARK_LINK_LIBRARIES
     AnyBlob
     ${AWS_LINK_LIBRARIES}
     Azure::azure-storage-blobs
     ${ANYBLOB_DEPS_INSTALL_DIR}/lib/libjemalloc.so
     dl)
+target_link_libraries(AnyBlobBenchmark ${ANYBLOB_BENCHMARK_LINK_LIBRARIES})
+
+enable_testing()
+add_executable(AzureSdkBackendTest test/azure_sdk_backend_test.cpp ${SRC_CPP} ${INCLUDE_HPP})
+target_link_libraries(AzureSdkBackendTest ${ANYBLOB_BENCHMARK_LINK_LIBRARIES})
+add_test(NAME AzureSdkBackendTest COMMAND AzureSdkBackendTest)
