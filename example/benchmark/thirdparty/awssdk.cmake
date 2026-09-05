@@ -24,7 +24,9 @@ set(AWS_REQUIRED_LIBS
   aws-c-common
 )
 
-set(AWS_INSTALL_DIR "thirdparty/awssdk/install")
+set(AWS_SOURCE_DIR "${ANYBLOB_DEPS_SOURCE_DIR}/awssdk")
+set(AWS_BUILD_DIR "${ANYBLOB_DEPS_BUILD_DIR}/awssdk")
+set(AWS_INSTALL_DIR "${ANYBLOB_DEPS_INSTALL_DIR}/awssdk")
 set(AWS_BUILD_BYPRODUCTS "")
 foreach(LIBNAME ${AWS_REQUIRED_LIBS})
   list(APPEND AWS_BUILD_BYPRODUCTS ${AWS_INSTALL_DIR}/lib/lib${LIBNAME}.a)
@@ -34,9 +36,13 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=deprecated-declarations -Wno-stri
 
 ExternalProject_Add(awssdk
   GIT_REPOSITORY      https://github.com/aws/aws-sdk-cpp.git
-  GIT_TAG             "1.11.31"
-  PREFIX              "thirdparty/awssdk"
+  GIT_TAG             "${AWS_SDK_GIT_TAG}"
+  PREFIX              "${ANYBLOB_DEPS_BUILD_DIR}/external/awssdk"
+  SOURCE_DIR          "${AWS_SOURCE_DIR}"
+  BINARY_DIR          "${AWS_BUILD_DIR}"
+  STAMP_DIR           "${ANYBLOB_DEPS_BUILD_DIR}/stamps/awssdk"
   INSTALL_DIR         ${AWS_INSTALL_DIR}
+  DEPENDS             anyblob-dependencies
   CMAKE_ARGS
     -DBUILD_ONLY=core\\$<SEMICOLON>s3\\$<SEMICOLON>s3-crt\\$<SEMICOLON>s3-encryption
     -DBUILD_SHARED_LIBS:BOOL=OFF
@@ -44,7 +50,10 @@ ExternalProject_Add(awssdk
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
     -DENABLE_TESTING:BOOL=OFF
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-    -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/${AWS_INSTALL_DIR}
+    -DCMAKE_INSTALL_PREFIX=${AWS_INSTALL_DIR}
+    -DCMAKE_INSTALL_LIBDIR=lib
+    -DCMAKE_PREFIX_PATH=${ANYBLOB_DEPS_INSTALL_DIR}
+    -DCMAKE_LIBRARY_PATH=${ANYBLOB_DEPS_INSTALL_DIR}/lib
     -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
     -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
     -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}

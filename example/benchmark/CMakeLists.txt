@@ -14,6 +14,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+include("${PROJECT_SOURCE_DIR}/thirdparty/dependencies.cmake")
+
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -Wall -fsanitize=undefined")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -march=native -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g -march=native -Wall")
@@ -53,4 +55,4 @@ include("${PROJECT_SOURCE_DIR}/src/local.cmake")
 # ---------------------------------------------------------------------------
 
 add_executable(AnyBlobBenchmark src/main.cpp ${SRC_CPP} ${INCLUDE_HPP})
-target_link_libraries(AnyBlobBenchmark AnyBlob ${AWS_LINK_LIBRARIES} jemalloc dl)
+target_link_libraries(AnyBlobBenchmark AnyBlob ${AWS_LINK_LIBRARIES} ${ANYBLOB_DEPS_INSTALL_DIR}/lib/libjemalloc.so dl)
