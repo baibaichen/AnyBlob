@@ -6,34 +6,20 @@
 
 Include(ExternalProject)
 
-set(ANYBLOB_SOURCE_DIR "${ANYBLOB_DEPS_SOURCE_DIR}/anyblob")
-set(ANYBLOB_BINARY_DIR "${ANYBLOB_DEPS_BUILD_DIR}/anyblob")
-
 # ---------------------------------------------------------------------------
 # Get AnyBlob
 # ---------------------------------------------------------------------------
 
 ExternalProject_Add(anyblob
   GIT_REPOSITORY      https://github.com/durner/AnyBlob.git
-  GIT_TAG             "${ANYBLOB_GIT_TAG}"
-    PREFIX              "${ANYBLOB_DEPS_BUILD_DIR}/external/anyblob"
-    SOURCE_DIR          "${ANYBLOB_SOURCE_DIR}"
-    BINARY_DIR          "${ANYBLOB_BINARY_DIR}"
-    STAMP_DIR           "${ANYBLOB_DEPS_BUILD_DIR}/stamps/anyblob"
+  GIT_TAG             "master"
+  PREFIX              "thirdparty/anyblob"
   INSTALL_COMMAND     ""
-    DEPENDS             anyblob-dependencies
   CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
     -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
     -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
-        -DCMAKE_PREFIX_PATH=${ANYBLOB_DEPS_INSTALL_DIR}
-        -DCMAKE_INCLUDE_PATH=${ANYBLOB_DEPS_INSTALL_DIR}/include
-        -DCMAKE_LIBRARY_PATH=${ANYBLOB_DEPS_INSTALL_DIR}/lib
-        -DCMAKE_EXE_LINKER_FLAGS=-L${ANYBLOB_DEPS_INSTALL_DIR}/lib
-        -DCMAKE_SHARED_LINKER_FLAGS=-L${ANYBLOB_DEPS_INSTALL_DIR}/lib
-        -DLIBURING_INCLUDE_DIR=${ANYBLOB_DEPS_INSTALL_DIR}/include
-        -DLIBURING_LIBRARY=${ANYBLOB_DEPS_INSTALL_DIR}/lib/liburing.so
 )
 
 # ---------------------------------------------------------------------------
@@ -70,7 +56,7 @@ add_library(AnyBlob STATIC IMPORTED)
 set_property(TARGET AnyBlob PROPERTY IMPORTED_LOCATION ${BINARY_DIR}/libAnyBlob.a)
 set_property(TARGET AnyBlob APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${ANYBLOB_INCLUDE_DIR})
 add_dependencies(AnyBlob anyblob)
-target_link_libraries(AnyBlob INTERFACE OpenSSL::SSL Threads::Threads ${ANYBLOB_DEPS_INSTALL_DIR}/lib/libjemalloc.so)
+target_link_libraries(AnyBlob INTERFACE OpenSSL::SSL Threads::Threads jemalloc)
 if (ANYBLOB_LIBCXX_COMPAT)
     target_compile_definitions(AnyBlob INTERFACE ANYBLOB_LIBCXX_COMPAT)
 endif()
