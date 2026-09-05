@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
     helpText += "-t concurrent Number of Threads\n";
     helpText += "-i number of iterations (default: 1)\n";
     helpText += "-s chunkSize\n";
-    helpText += "-a algorithm [uring, s3, s3crt]\n";
+    helpText += "-a algorithm [uring, s3, s3crt, azuresdk]\n";
     helpText += "-o csv output file\n";
     helpText += "-d dnsresolver (default: throughput [aws])\n";
     helpText += "-e clientEmail [required for IBM, Oracle, GCP & Azure]\n";
@@ -142,11 +142,14 @@ int main(int argc, char* argv[]) {
                 bandwithSettings.systems = {anyblob::benchmark::Bandwidth::Systems::S3};
             else if (!strcmp(argv[i], "s3crt"))
                 bandwithSettings.systems = {anyblob::benchmark::Bandwidth::Systems::S3Crt};
-            else if (bandwithSettings.oneLake && strcmp(argv[i], "uring")) {
-                cerr << "OneLake only supports -a uring" << endl;
+            else if (!strcmp(argv[i], "azuresdk"))
+                bandwithSettings.systems = {anyblob::benchmark::Bandwidth::Systems::AzureSdk};
+            else if (strcmp(argv[i], "uring")) {
+                cerr << "Unknown algorithm; expected uring, s3, s3crt, or azuresdk" << endl;
                 return 2;
-            } else
+            } else {
                 bandwithSettings.systems = {anyblob::benchmark::Bandwidth::Systems::Uring};
+            }
         } else if (!strcmp(argv[i], "-l")) {
             bandwithSettings.requests = atoi(argv[++i]);
         } else {
@@ -155,9 +158,21 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    if (!bandwithSettings.oneLake
+        && bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::AzureSdk) {
+        cerr << "The azuresdk algorithm is only supported by the onelake provider" << endl;
+        return 2;
+    }
+
     if (bandwithSettings.oneLake) {
-        if (bandwithSettings.systems.front() != anyblob::benchmark::Bandwidth::Systems::Uring || !bandwithSettings.https || bandwithSettings.testUpload || bandwithSettings.encryption) {
-            cerr << "OneLake requires -a uring -h 1 -u 0 -x 0 (no uploads or client-side decryption)" << endl;
+        const auto system = bandwithSettings.systems.front();
+        constexpr uint64_t maxAzureWorkers = 1024;
+        constexpr uint64_t maxAzureBufferBytes = 1ull << 30;
+        const auto configuredInFlight
+            = static_cast<uint64_t>(bandwithSettings.concurrentThreads) * bandwithSettings.concurrentRequests;
+        if ((system != anyblob::benchmark::Bandwidth::Systems::Uring && system != anyblob::benchmark::Bandwidth::Systems::AzureSdk)
+            || !bandwithSettings.https || bandwithSettings.testUpload || bandwithSettings.encryption) {
+            cerr << "OneLake requires -a uring or azuresdk, -h 1 -u 0 -x 0 (no uploads or client-side decryption)" << endl;
             return 2;
         }
         if (azureSettings.container.empty() || azureSettings.container.find_first_of("/\r\n ?#") != string::npos ||
@@ -165,6 +180,13 @@ int main(int argc, char* argv[]) {
             !bandwithSettings.concurrentThreads || !bandwithSettings.concurrentRequests || !bandwithSettings.requests || !bandwithSettings.iterations || !bandwithSettings.chunkSize ||
             !bandwithSettings.requestTimeoutMs || bandwithSettings.requestTimeoutMs > 60000 ||
             bandwithSettings.readLength < 2 || bandwithSettings.readOffset > numeric_limits<uint64_t>::max() - bandwithSettings.readLength ||
+            (system == anyblob::benchmark::Bandwidth::Systems::AzureSdk
+                && (bandwithSettings.readOffset > static_cast<uint64_t>(numeric_limits<int64_t>::max())
+                    || bandwithSettings.readLength > static_cast<uint64_t>(numeric_limits<int64_t>::max())
+                    || bandwithSettings.readLength > numeric_limits<size_t>::max()
+                    || bandwithSettings.readOffset + bandwithSettings.readLength - 1 > static_cast<uint64_t>(numeric_limits<int64_t>::max())
+                    || configuredInFlight > maxAzureWorkers
+                    || configuredInFlight > maxAzureBufferBytes / bandwithSettings.readLength)) ||
             bandwithSettings.requests > numeric_limits<uint64_t>::max() / bandwithSettings.readLength) {
             cerr << "OneLake requires a workspace, URL-encoded relative object path, positive run settings, and a valid byte range of at least 2 bytes" << endl;
             return 2;

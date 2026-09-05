@@ -19,7 +19,8 @@ class Bandwidth {
     enum class Systems : uint8_t {
         Uring,
         S3,
-        S3Crt
+        S3Crt,
+        AzureSdk
     };
     /// Settings for the bandwidth benchmark
     struct Settings {
@@ -64,6 +65,8 @@ class Bandwidth {
     static void run(const Settings& benchmarkSettings, const std::string& uri);
     /// Uring benchmark runner
     static void runUring(const Settings& benchmarkSettings, const std::string& uri);
+    /// Azure Storage SDK benchmark runner
+    static void runAzureSdk(const Settings& benchmarkSettings, const std::string& uri);
     /// S3 benchmark runner
     template <typename S3SendReceiver>
     static void runS3(const Settings& benchmarkSettings, const std::string& uri);

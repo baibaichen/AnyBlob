@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.18)
 
 project(AnyBlobBenchmark)
 
@@ -34,6 +34,12 @@ include("${PROJECT_SOURCE_DIR}/thirdparty/anyblob.cmake")
 include("${PROJECT_SOURCE_DIR}/thirdparty/awssdk.cmake")
 
 # ---------------------------------------------------------------------------
+# Azure SDK
+# ---------------------------------------------------------------------------
+
+include("${PROJECT_SOURCE_DIR}/thirdparty/azuresdk.cmake")
+
+# ---------------------------------------------------------------------------
 # Includes
 # ---------------------------------------------------------------------------
 
@@ -55,4 +61,10 @@ include("${PROJECT_SOURCE_DIR}/src/local.cmake")
 # ---------------------------------------------------------------------------
 
 add_executable(AnyBlobBenchmark src/main.cpp ${SRC_CPP} ${INCLUDE_HPP})
-target_link_libraries(AnyBlobBenchmark AnyBlob ${AWS_LINK_LIBRARIES} ${ANYBLOB_DEPS_INSTALL_DIR}/lib/libjemalloc.so dl)
+target_link_libraries(
+    AnyBlobBenchmark
+    AnyBlob
+    ${AWS_LINK_LIBRARIES}
+    Azure::azure-storage-blobs
+    ${ANYBLOB_DEPS_INSTALL_DIR}/lib/libjemalloc.so
+    dl)

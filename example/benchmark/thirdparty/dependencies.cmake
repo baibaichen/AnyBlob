@@ -17,6 +17,10 @@ set(ANYBLOB_GIT_REPOSITORY https://github.com/durner/AnyBlob.git CACHE STRING "A
 set(ANYBLOB_GIT_TAG "" CACHE STRING "AnyBlob git tag or commit when not using a local source tree")
 set(ANYBLOB_LOCAL_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../.." CACHE PATH "Use a local AnyBlob source tree instead of downloading it")
 set(AWS_SDK_GIT_TAG ee48dbe5ba4be1f17fb24cae177a42ee5128e02d CACHE STRING "AWS SDK for C++ git tag or commit (1.11.31)")
+set(AZURE_CORE_GIT_TAG b6e7a28c6200d50080c38a598cf92d96d45cf976 CACHE STRING "Azure Core SDK commit (1.15.0)")
+set(AZURE_STORAGE_COMMON_GIT_TAG d693099d44c4f965cde6ff06d6f3cd0358ef01a8 CACHE STRING "Azure Storage Common SDK commit (12.3.2)")
+set(AZURE_STORAGE_BLOBS_GIT_TAG 2850c5d32c8a86491b49e801433b8f186fa81745 CACHE STRING "Azure Storage Blobs SDK commit (12.7.0)")
+set(LIBXML2_GIT_TAG d23960a130c5bb82779c9405fbbf85e65fb3c57c CACHE STRING "libxml2 commit (2.14.6)")
 
 file(MAKE_DIRECTORY
     "${ANYBLOB_DEPS_SOURCE_DIR}"

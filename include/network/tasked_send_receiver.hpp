@@ -63,6 +63,12 @@ class TaskedSendReceiverGroup {
     std::condition_variable _cv;
     /// Mutex for condition variable
     std::mutex _mutex;
+    /// Retries performed after the initial logical request attempt
+    std::atomic<uint64_t> _retryAttempts{0};
+    /// Highest number of requests simultaneously active across all receivers
+    std::atomic<uint64_t> _observedConcurrency{0};
+    /// Requests currently active across all receivers
+    std::atomic<uint64_t> _activeRequests{0};
 
     public:
     /// Initializes the global submissions and completions
@@ -96,6 +102,13 @@ class TaskedSendReceiverGroup {
     unsigned getConcurrentRequests() const {
         return _concurrentRequests;
     }
+    void resetTelemetry() {
+        _retryAttempts = 0;
+        _observedConcurrency = 0;
+        _activeRequests = 0;
+    }
+    uint64_t getRetryAttempts() const { return _retryAttempts; }
+    uint64_t getObservedConcurrency() const { return _observedConcurrency; }
 
     friend TaskedSendReceiver;
     friend TaskedSendReceiverHandle;
