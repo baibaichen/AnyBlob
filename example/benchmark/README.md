@@ -49,6 +49,32 @@ The binary keeps all three comparison backends. Select one per run with
 `-a uring`, `-a s3`, or `-a s3crt`, using identical data and concurrency
 settings for a fair comparison.
 
+## Local OneLake Reads
+
+The `onelake` mode uses AnyBlob's download engine with the Azure Blob REST
+endpoint, not an Azure SDK client. It supports read-only byte ranges on an exact,
+URL-encoded object path. SharedKey Azure mode is unchanged.
+
+Acquire a short-lived token for `https://storage.azure.com/` using the explicitly
+selected tenant/subscription, and supply it as `AZURE_STORAGE_BEARER_TOKEN` in the
+benchmark process environment. Never put the token in command arguments or logs.
+The token must remain valid for the run; this mode does not refresh it. TLS peer
+and hostname verification are required. `SSL_CERT_FILE` may point to the system
+CA bundle (for example `/etc/pki/tls/certs/ca-bundle.crt` on Azure Linux).
+
+```sh
+./build/Release/AnyBlobBenchmark onelake bandwidth \
+	-b <workspace> \
+	--object-path <lakehouse>.Lakehouse/Files/<object> \
+	--read-offset 0 --read-bytes 1048576 \
+	--request-timeout-ms 5000 -l 8 -c 2 -t 1 -i 1 -o onelake.csv
+```
+
+Only `-a uring` is supported in this mode. Each response must be HTTP 206 and
+contain the requested byte count. Any failed or short read makes the run fail;
+do not treat an output file from a failed run as a performance result. A repeated
+single-range smoke test checks connectivity, not cold-storage throughput.
+
 ## Database Experiments
 
 All our DBMS related experiments and our binary of our proprietary system are shared in https://gitlab.db.in.tum.de/durner/cloud-storage-analytics.

@@ -24,15 +24,15 @@ class Bandwidth {
     /// Settings for the bandwidth benchmark
     struct Settings {
         /// Number of network sockets/threads
-        uint32_t concurrentThreads;
+        uint32_t concurrentThreads = 1;
         /// Number of simultaneous requests per socket
-        uint32_t concurrentRequests;
+        uint32_t concurrentRequests = 1;
         /// Total number of requests
-        uint64_t requests;
+        uint64_t requests = 8;
         /// The chunksize
         uint64_t chunkSize = 64u * 1024;
         /// Choose random file from xxx.bin (xxx files from 0 to this)
-        uint32_t blobFiles;
+        uint32_t blobFiles = 1;
         /// The number of iterations
         uint32_t iterations = 1;
         /// The filepath
@@ -53,6 +53,11 @@ class Bandwidth {
         bool encryption = false;
         /// Test upload
         bool testUpload = false;
+        bool oneLake = false;
+        std::string objectPath;
+        uint64_t readOffset = 0;
+        uint64_t readLength = 1024 * 1024;
+        uint64_t requestTimeoutMs = 5000;
     };
 
     /// Benchmark runner

@@ -10,6 +10,7 @@
 #include "perfevent/PerfEvent.hpp"
 #include "utils/timer.hpp"
 #include "utils/utils.hpp"
+#include <cstdlib>
 #include <fstream>
 #include <future>
 #include <iostream>
@@ -155,6 +156,8 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
 {
     network::TaskedSendReceiverGroup group(benchmarkSettings.chunkSize, benchmarkSettings.requests << 1);
     group.setConcurrentRequests(benchmarkSettings.concurrentRequests);
+    if (benchmarkSettings.oneLake)
+        group.setRequestTimeout(chrono::milliseconds(benchmarkSettings.requestTimeoutMs));
     vector<unique_ptr<network::TaskedSendReceiverHandle>> sendReceiverHandles;
     vector<unique_ptr<network::TaskedSendReceiverGroup>> taskGroups;
     for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
@@ -165,7 +168,18 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
     string key = "";
     if (!benchmarkSettings.rsaKeyFile.empty())
         key = cloud::Provider::getKey(benchmarkSettings.rsaKeyFile);
-    auto cloudProvider = cloud::Provider::makeProvider(uri, benchmarkSettings.https, benchmarkSettings.account, key, sendReceiverHandles.back().get());
+    unique_ptr<cloud::Provider> cloudProvider;
+    if (benchmarkSettings.oneLake) {
+        const char* token = getenv("AZURE_STORAGE_BEARER_TOKEN");
+        if (!token || !*token)
+            throw runtime_error("AZURE_STORAGE_BEARER_TOKEN is not set");
+        auto info = cloud::Provider::getRemoteInfo(uri);
+        info.endpoint = "onelake.blob.fabric.microsoft.com";
+        info.port = 443;
+        cloudProvider = make_unique<cloud::Azure>(info, cloud::Azure::BearerToken{token});
+    } else {
+        cloudProvider = cloud::Provider::makeProvider(uri, benchmarkSettings.https, benchmarkSettings.account, key, sendReceiverHandles.back().get());
+    }
 
     if (cloudProvider->getType() == cloud::Provider::CloudService::AWS) {
         auto awsProvider = static_cast<cloud::AWS*>(cloudProvider.get());
@@ -192,12 +206,22 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         mt19937 rng(dev());
         uniform_int_distribution<mt19937::result_type> dist(1, benchmarkSettings.blobFiles);
         pair<uint64_t, uint64_t> range = {0, 0};
+        if (benchmarkSettings.oneLake)
+            range = {benchmarkSettings.readOffset, benchmarkSettings.readOffset + benchmarkSettings.readLength - 1};
         atomic<uint64_t> finishedMessages = 0;
+        atomic<uint64_t> failedMessages = 0;
+        atomic<uint64_t> verifiedBytes = 0;
         auto enc = benchmarkSettings.encryption;
 
-        auto callback = [&finishedMessages, &sendReceiverHandles, &enc, aesKey, aesIv](network::MessageResult& result) {
+        auto callback = [&finishedMessages, &failedMessages, &verifiedBytes, &benchmarkSettings, &sendReceiverHandles, &enc, aesKey, aesIv](network::MessageResult& result) {
             if (!result.success()) {
+                failedMessages++;
                 cerr << "Request was not successful: " << result.getFailureCode() << endl;
+                if (benchmarkSettings.oneLake)
+                    cerr << "OneLake HTTP status: " << result.getResponseCodeNumber() << endl;
+            } else if (benchmarkSettings.oneLake && (result.getResponseCodeNumber() != 206 || result.getSize() != benchmarkSettings.readLength)) {
+                failedMessages++;
+                cerr << "OneLake response status or byte count does not match the requested range" << endl;
             } else if (enc) {
                 auto plain = sendReceiverHandles.back()->get()->getReused();
                 if (!plain)
@@ -212,6 +236,8 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
                 }
                 sendReceiverHandles.back()->get()->reuse(move(plain));
             }
+            if (benchmarkSettings.oneLake && result.success())
+                verifiedBytes += result.getSize();
             finishedMessages++;
             sendReceiverHandles.back()->get()->reuse(result.moveDataVector());
         };
@@ -221,7 +247,16 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
             getTxn[i].setProvider(cloudProvider.get());
 
-        if (benchmarkSettings.blobFiles > benchmarkSettings.requests) {
+        if (benchmarkSettings.oneLake) {
+            for (uint64_t requestId = 0; requestId < benchmarkSettings.requests; ++requestId) {
+                auto filePath = benchmarkSettings.objectPath;
+                const auto threadId = requestId % benchmarkSettings.concurrentThreads;
+                auto getObjectRequest = [&getTxn, &filePath, &range, threadId, requestId, callback]() {
+                    return getTxn[threadId].getObjectRequest(move(callback), filePath, range, nullptr, 0, requestId);
+                };
+                getTxn[threadId].verifyKeyRequest(*sendReceiverHandles.back(), move(getObjectRequest));
+            }
+        } else if (benchmarkSettings.blobFiles > benchmarkSettings.requests) {
             for (auto i = 0u; i < benchmarkSettings.requests; i++) {
                 auto filePath = benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
                 auto getObjectRequest = [&getTxn, &filePath, &range, i, callback]() {
@@ -282,6 +317,16 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
 
             while (finishedMessages != benchmarkSettings.requests)
                 usleep(100);
+        }
+
+        if (benchmarkSettings.oneLake) {
+            for (auto& handle : sendReceiverHandles)
+                handle->stop();
+            for (auto& worker : asyncSendReceiverThreads)
+                worker.get();
+            if (failedMessages || verifiedBytes != benchmarkSettings.requests * benchmarkSettings.readLength)
+                throw runtime_error("OneLake read validation failed; no successful benchmark result was recorded");
+            cout << "OneLake AnyBlob completed: requests=" << finishedMessages << " bytes=" << verifiedBytes << " failures=" << failedMessages << endl;
         }
 
         if (benchmarkSettings.testUpload) {
@@ -353,7 +398,8 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
             sendReceiverHandles[i]->stop();
 
         for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
-            asyncSendReceiverThreads[i].get();
+            if (asyncSendReceiverThreads[i].valid())
+                asyncSendReceiverThreads[i].get();
     }
 }
 //---------------------------------------------------------------------------

@@ -89,6 +89,9 @@ class TaskedSendReceiverGroup {
         if (_concurrentRequests != concurrentRequests)
             _concurrentRequests = concurrentRequests;
     }
+    void setRequestTimeout(std::chrono::milliseconds timeout) {
+        _tcpSettings->timeout = timeout;
+    }
     /// Get the concurrent requests
     unsigned getConcurrentRequests() const {
         return _concurrentRequests;
