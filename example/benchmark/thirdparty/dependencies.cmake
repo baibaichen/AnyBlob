@@ -12,6 +12,7 @@ set(ANYBLOB_DEPS_UPDATE_DISCONNECTED OFF CACHE BOOL "Do not update downloaded de
 set(ANYBLOB_JOBS 16 CACHE STRING "Parallel jobs for downloaded dependencies")
 set(AWS_LC_GIT_TAG 2f1879759b2e0fc70592665bdf10087b64f44b7d CACHE STRING "AWS-LC git tag or commit")
 set(CURL_GIT_TAG 01346829096c61b372692f6dc43ffa778c6caccd CACHE STRING "curl git tag or commit (curl 8.22.0)")
+set(ZLIB_GIT_TAG 51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf CACHE STRING "zlib git tag or commit (1.3.1)")
 set(ANYBLOB_GIT_REPOSITORY https://github.com/durner/AnyBlob.git CACHE STRING "AnyBlob git repository")
 set(ANYBLOB_GIT_TAG "" CACHE STRING "AnyBlob git tag or commit when not using a local source tree")
 set(ANYBLOB_LOCAL_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../.." CACHE PATH "Use a local AnyBlob source tree instead of downloading it")
@@ -25,7 +26,22 @@ file(MAKE_DIRECTORY
     "${ANYBLOB_DEPS_INSTALL_DIR}/lib")
 
 find_package(Threads REQUIRED)
-find_package(ZLIB REQUIRED)
+
+ExternalProject_Add(zlib
+    GIT_REPOSITORY https://github.com/madler/zlib.git
+    GIT_TAG ${ZLIB_GIT_TAG}
+    SOURCE_DIR "${ANYBLOB_DEPS_SOURCE_DIR}/zlib"
+    BINARY_DIR "${ANYBLOB_DEPS_BUILD_DIR}/zlib"
+    STAMP_DIR "${ANYBLOB_DEPS_BUILD_DIR}/stamps/zlib"
+    CMAKE_ARGS
+        -DBUILD_SHARED_LIBS=OFF
+        -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_INSTALL_LIBDIR=lib
+        -DCMAKE_INSTALL_PREFIX=${ANYBLOB_DEPS_INSTALL_DIR}
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --parallel ${ANYBLOB_JOBS}
+    INSTALL_COMMAND ${CMAKE_COMMAND} --install <BINARY_DIR>
+    UPDATE_DISCONNECTED ${ANYBLOB_DEPS_UPDATE_DISCONNECTED})
 
 ExternalProject_Add(aws-lc
     GIT_REPOSITORY https://github.com/aws/aws-lc.git
@@ -107,7 +123,13 @@ ExternalProject_Add(jemalloc
     INSTALL_COMMAND make -C <SOURCE_DIR> install
     UPDATE_DISCONNECTED ${ANYBLOB_DEPS_UPDATE_DISCONNECTED})
 
-add_custom_target(anyblob-dependencies DEPENDS aws-lc curl liburing jemalloc)
+add_custom_target(anyblob-dependencies DEPENDS aws-lc curl zlib liburing jemalloc)
+
+add_library(ZLIB::ZLIB STATIC IMPORTED GLOBAL)
+set_target_properties(ZLIB::ZLIB PROPERTIES
+    IMPORTED_LOCATION "${ANYBLOB_DEPS_INSTALL_DIR}/lib/libz.a"
+    INTERFACE_INCLUDE_DIRECTORIES "${ANYBLOB_DEPS_INSTALL_DIR}/include")
+add_dependencies(ZLIB::ZLIB zlib)
 
 add_library(OpenSSL::Crypto STATIC IMPORTED GLOBAL)
 set_target_properties(OpenSSL::Crypto PROPERTIES
