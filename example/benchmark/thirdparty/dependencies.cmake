@@ -10,7 +10,7 @@ set(ANYBLOB_DEPS_BUILD_DIR "${ANYBLOB_DEPS_ROOT}/build")
 set(ANYBLOB_DEPS_INSTALL_DIR "${ANYBLOB_DEPS_ROOT}/prefix")
 set(ANYBLOB_DEPS_UPDATE_DISCONNECTED OFF CACHE BOOL "Do not update downloaded dependencies")
 set(ANYBLOB_JOBS 16 CACHE STRING "Parallel jobs for downloaded dependencies")
-set(AWS_LC_GIT_TAG 2f1879759b2e0fc70592665bdf10087b64f44b7d CACHE STRING "AWS-LC git tag or commit")
+set(AWS_LC_GIT_TAG 75a73bfabf1be384b49c7f92da6fdfd9d867069e CACHE STRING "AWS-LC git tag or commit (1.3.0, pinned by AWS SDK 1.11.31)")
 set(CURL_GIT_TAG 01346829096c61b372692f6dc43ffa778c6caccd CACHE STRING "curl git tag or commit (curl 8.22.0)")
 set(ZLIB_GIT_TAG 51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf CACHE STRING "zlib git tag or commit (1.3.1)")
 set(ANYBLOB_GIT_REPOSITORY https://github.com/durner/AnyBlob.git CACHE STRING "AnyBlob git repository")
@@ -54,6 +54,7 @@ ExternalProject_Add(aws-lc
         -DBUILD_SHARED_LIBS=OFF
         -DBUILD_TESTING=OFF
         -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_C_FLAGS=-Wno-error=stringop-overflow
         -DCMAKE_INSTALL_LIBDIR=lib
         -DCMAKE_INSTALL_PREFIX=${ANYBLOB_DEPS_INSTALL_DIR}
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
