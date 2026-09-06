@@ -4,7 +4,7 @@
 
 Include(ExternalProject)
 
-set(ANYBLOB_DEPS_ROOT "${CMAKE_SOURCE_DIR}/../../.deps" CACHE PATH "Dependency source, build, and install root")
+set(ANYBLOB_DEPS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../.deps" CACHE PATH "Dependency source, build, and install root")
 set(ANYBLOB_DEPS_SOURCE_DIR "${ANYBLOB_DEPS_ROOT}/src")
 set(ANYBLOB_DEPS_BUILD_DIR "${ANYBLOB_DEPS_ROOT}/build")
 set(ANYBLOB_DEPS_INSTALL_DIR "${ANYBLOB_DEPS_ROOT}/prefix")

@@ -33,6 +33,16 @@ same AWS-LC build.
 	  -DCMAKE_BUILD_TYPE=Release
 	cmake --build build/Release --target AnyBlobBenchmark --parallel 16
 
+The repository root is the default CMake entry point for the benchmark, so IDEs
+such as CLion can open the repository directly:
+
+	cmake -S . -B build/benchmark -DCMAKE_BUILD_TYPE=Release
+	cmake --build build/benchmark --target AnyBlobBenchmark --parallel 16
+
+Use `-DANYBLOB_BUILD_BENCHMARK=OFF` when configuring the repository root to
+build only the core `AnyBlob`, `tester`, and `integration` targets. When
+`.deps/prefix` exists, the core-only mode reuses its pinned libraries.
+
 The dependency layout is:
 
 	.deps/src       # downloaded sources
